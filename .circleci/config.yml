@@ -241,7 +241,8 @@ jobs:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
-      # 's w you will add some code to rollback on failure      
+      # Rollback on failure  
+      - destroy-environment     
 
 #   configure-infrastructure:
 #     docker:
@@ -260,7 +261,7 @@ jobs:
 #           command: |
 #             # Your code 
 #             exit 1
-#       # 's w you will add some code to rollback on failure      
+#       # Rollback on failure      
 
 #   run-migrations:
 #     docker:
@@ -277,7 +278,7 @@ jobs:
 #           command: |
 #             # Your code 
 #             exit 1
-#      # 's w you will add some code to rollback on failure      
+#      # Rollback on failure      
 
 #   deploy-frontend:
 #     docker:
@@ -298,7 +299,7 @@ jobs:
 #           name: Deploy frontend objects
 #           command: |
 #             # your code 
-#       # 's w you will add some code to rollback on failure      
+#       # Rollback on failure      
                     
 #   deploy-backend:
 #     docker:
@@ -315,7 +316,7 @@ jobs:
 #           name: Deploy backend
 #           command: |
 #             # your code 
-#       # 's w you will add some code to rollback on failure  
+#       # Rollback on failure  
 
 #   smoke-test:
 #     docker:
@@ -338,7 +339,7 @@ jobs:
 #           name: Frontend smoke test.
 #           command: |
 #             # your code 
-#       # 's w you will add some code to rollback on failure  
+#       # Rollback on failure  
 
 #   cloudfront-update:
 #     docker:
@@ -353,7 +354,7 @@ jobs:
 #           name: Update cloudfront distribution
 #           command: |
 #             # your code 
-#       # 's w you will add some code to rollback on failure  
+#       # Rollback on failure  
 
   # cleanup:
   #   docker:
