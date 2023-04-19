@@ -47,7 +47,7 @@ commands:
           name: Destroy environments
           when: on_fail
           command: |
-            # Your code 
+            echo "Destroying environment: << parameters.Workflow_ID >> "
             aws s3 rm s3://udapeople-<<parameters.workflow_id>> --recursive
             aws cloudformation delete-stack --stack-name "udapeople-backend-<<parameters.workflow_id>>"
             aws cloudformation delete-stack --stack-name "udapeople-frontend-<<parameters.workflow_id>>"
@@ -144,7 +144,7 @@ jobs:
       - run:
           name: Backend test
           command: |
-            # Your code here
+            
             cd backend
             npm install
             npm run test
@@ -166,7 +166,6 @@ jobs:
       - run:
           name: Scan-Frontend
           command: |
-            # Your code here
             cd frontend
             npm install
             npm audit fix --audit-level=critical --force
@@ -190,7 +189,6 @@ jobs:
       - run:
           name: Scan-Backend
           command: |
-            # Your code here
             cd backend
             npm install
             npm audit fix --audit-level=critical --force
@@ -302,11 +300,12 @@ jobs:
     steps:
       # Checkout code from git
       - checkout
-      # - add_ssh_keys:
-      #     fingerprints: 
-      #       - "ed:8e:5a:6b:4f:36:ff:3d:3c:fb:9d:d3:d9:aa:94:b1"
-      # - attach_workspace:
-      #     at: ~/
+      # Add ssh keys with fingerprint
+      - add_ssh_keys:
+          fingerprints: 
+            - "ed:8e:5a:6b:4f:36:ff:3d:3c:fb:9d:d3:d9:aa:94:b1"
+      - attach_workspace:
+          at: ~/
       # Install dependencies
       - install_nodejs
       - install_awscli
@@ -314,13 +313,23 @@ jobs:
       - run:
           name: Get backend url
           command: |
-            # your code 
+            # your code here
+            export BACKEND_IP=$(aws ec2 describe-instances \
+            --query 'Reservations[*].Instances[*].PublicIpAddress' \
+            --filter Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7} \
+            --output text 
+            )
             export API_URL="http://${BACKEND_IP}:3030"
-            echo "${API_URL}"
+            echo "API_URL = ${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
       - run:
           name: Deploy frontend objects
           command: |
-            # your code 
+            cd frontend
+            npm install
+            npm run build
+            aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
       # Rollback on failure      
       - destroy-environment 
       - revert-migrations
@@ -415,40 +424,62 @@ jobs:
       - destroy-environment
       - revert-migrations
 
-#   cloudfront-update:
-#     docker:
-#       # Docker image  that supports AWS CLI
-#     steps:
-#       # Checkout code from git
-#       - run:
-#           name: Install dependencies
-#           command: |
-#             # your code 
-#       - run:
-#           name: Update cloudfront distribution
-#           command: |
-#             # your code 
-#       # Rollback on failure  
+  cloudfront-update:
+    docker:
+      # Docker image  that supports AWS CLI
+      - image: amazon/aws-cli
+    steps:
+      # Checkout code from git
+      - checkout
+      - run:
+          name: Install dep / Save Old Workflow ID to kvdb.io
+          command: |
+            export OLD_WORKFLOW_ID=$(aws cloudformation \
+            list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
+            --no-paginate --output text)
+            echo "Old Wokflow ID: $OLD_WORKFLOW_ID"
+            curl https://kvdb.io/9uSGYULej31HQS5M7SUtK6/old_workflow_id -d "${OLD_WORKFLOW_ID}"
+      - run:
+          name: Update cloudfront distribution
+          command: |
+            aws cloudformation deploy \
+            --template-file .circleci/files/cloudfront.yml \
+            --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
+            --stack-name InitialStack
+      # Rollback on failure  
+      - destroy-environment
+      - revert-migrations
 
-  # cleanup:
-  #   docker:
-  #     # Docker image 
-  #   steps:
-  #     # Checkout code from git
-  #     - run:
-  #         name: Get old stack workflow id
-  #         command: |
-  #           # your code 
-  #           export OldWorkflowID="the id "
-  #           export STACKS=[] #put the list of stacks 
-  #     - run:
-  #         name: Remove old stacks and files
-  #         command: |
-  #           if [[ "${STACKS[@]}" =~ "${OldWorkflowID}" ]]
-  #           then
-  #             # your code 
-  #           fi
-            
+  cleanup:
+    docker:
+      # Docker image 
+      - image: cimg/base:stable
+    steps:
+      # Checkout code from git
+      - checkout
+      # Install dependencies
+      - install_awscli
+      - run:
+          name: Get old stack workflow id
+          command: |
+            export STACKS=($(aws cloudformation list-stacks \
+                --query "StackSummaries[*].StackName" \
+                --stack-status-filter CREATE_COMPLETE --no-paginate --output text)) 
+            echo Stack names: "${STACKS[@]}"
+            export OldWorkflowID=$(curl --insecure https://kvdb.io/9uSGYULej31HQS5M7SUtK6/old_workflow_id)
+            echo Old Workflow ID: $OldWorkflowID
+      - run:
+          name: Remove old stacks and files
+          command: |
+            export OldWorkflowID=$(curl --insecure https://kvdb.io/9uSGYULej31HQS5M7SUtK6/old_workflow_id)
+            echo Old Workflow ID: $OldWorkflowID 
+
+            if [[ "${STACKS[@]}" =~ "${OldWorkflowID}" ]]
+            then
+              aws s3 rm "s3://udapeople-${OldWorkflowID}" --recursive
+              aws cloudformation delete-stack --stack-name "udapeople-backend-${OldWorkflowID}"
+              aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID}"
+            fi
 
 workflows:
   default:
@@ -478,7 +509,7 @@ workflows:
           requires: [run-migrations]
       - smoke-test:
           requires: [deploy-backend, deploy-frontend]
-      # - cloudfront-update:
-      #     requires: [smoke-test]
-      # - cleanup:
-      #     requires: [cloudfront-update]
+      - cloudfront-update:
+          requires: [smoke-test]
+      - cleanup:
+          requires: [cloudfront-update]
