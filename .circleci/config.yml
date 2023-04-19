@@ -314,11 +314,12 @@ jobs:
           name: Get backend url
           command: |
             # your code here
-            export BACKEND_PUBLIC_IP=$(aws --region us-east-1 ec2 describe-instances --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+            export BACKEND_PUBLIC_IP=$(aws ec2 describe-instances 
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --query 'Reservations[*].Instances[*].PublicDnsName' \
               --output text)
             export API_URL="http://${BACKEND_PUBLIC_IP}:3030"
-            echo "${API_URL}"
+            echo "API_URL = ${API_URL}"
             echo API_URL="http://${BACKEND_PUBLIC_IP}:3030" >> frontend/.env
             cat frontend/.env
       - run:
@@ -429,18 +430,22 @@ jobs:
       - run:
           name: Install dep / Save Old Workflow ID to kvdb.io
           command: |
-            export OLD_WORKFLOW_ID=$(aws cloudformation \
-            list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
-            --no-paginate --output text)
+            export OLD_WORKFLOW_ID=$(aws cloudformation list-exports \
+              --query "Exports[?Name==\`WorkflowID\`].Value" 
+              --no-paginate 
+              --output text)
             echo "Old Wokflow ID: $OLD_WORKFLOW_ID"
-            curl https://kvdb.io/9uSGYULej31HQS5M7SUtK6/old_workflow_id -d "${OLD_WORKFLOW_ID}"
+            curl https://kvdb.io/yusiwo3FY7EYcbxeeoni/old_workflow_id -d "${OLD_WORKFLOW_ID}"
       - run:
           name: Update cloudfront distribution
           command: |
             aws cloudformation deploy \
             --template-file .circleci/files/cloudfront.yml \
+            --stack-name "InitialStack-${$OLD_WORKFLOW_ID}"
             --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
-            --stack-name InitialStack
+            --tag project=udapeople
+            echo OLD_WORKFLOW_ID: "$OLD_WORKFLOW_ID"
+            echo CURRENT_WORKFLOW_ID: "${CIRCLE_WORKFLOW_ID:0:7}"
       # Rollback on failure  
       - destroy-environment
       - revert-migrations
