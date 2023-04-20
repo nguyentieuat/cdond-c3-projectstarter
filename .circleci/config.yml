@@ -431,8 +431,8 @@ jobs:
           name: Install dep / Save Old Workflow ID to kvdb.io
           command: |
             export OLD_WORKFLOW_ID=$(aws cloudformation list-exports \
-              --query "Exports[?Name==\`WorkflowID\`].Value" 
-              --no-paginate 
+              --query "Exports[?Name==\`WorkflowID\`].Value" \
+              --no-paginate \
               --output text)
             echo "Old Wokflow ID: $OLD_WORKFLOW_ID"
             curl https://kvdb.io/yusiwo3FY7EYcbxeeoni/old_workflow_id -d "${OLD_WORKFLOW_ID}"
@@ -441,11 +441,11 @@ jobs:
           command: |
             OLD_WORKFLOW_ID=$(aws cloudformation list-exports \
               --query "Exports[?Name==\`WorkflowID\`].Value" 
-              --no-paginate 
+              --no-paginate \
               --output text)
             aws cloudformation deploy \
               --template-file .circleci/files/cloudfront.yml \
-              --stack-name "InitialStack-${$OLD_WORKFLOW_ID}"
+              --stack-name "InitialStack-${$OLD_WORKFLOW_ID}" \
               --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --tag project=udapeople
             echo OLD_WORKFLOW_ID: "$OLD_WORKFLOW_ID"
