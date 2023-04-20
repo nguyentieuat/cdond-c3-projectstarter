@@ -65,6 +65,16 @@ commands:
           name: Revert migrations
           when: on_fail
           command: |
+          SUCCESS=$(curl -H "token: e52b52de-ee26-41a5-86e8-e8dcc3d995a5" --request GET https://api.memstash.io/values/migration_<< parameters.workflow_id >>)
+            # Example: kvdb.io
+            SUCCESS=$(curl --insecure  https://kvdb.io/9GE4jRtKznmVKRfvdBABBe/migration_<< parameters.workflow_id >>)
+            # Logic for reverting the database state
+            if (( $SUCCESS == 1 ));
+            then
+                cd ~/project/backend
+                npm install
+                npm run migration:revert
+            fi  
             SUCCESS=$(curl --insecure  https://kvdb.io/9uSGYULej31HQS5M7SUtK6/migration_<< parameters.workflow_id >>)
             if [[ "${SUCCESS}" == "1" ]];
             then
@@ -411,7 +421,7 @@ jobs:
             if curl -s ${URL} | grep "Welcome"
             then
                 # Change this to 0 after the job fails
-              exit 0
+              exit 1
             else
               exit 1
             fi
